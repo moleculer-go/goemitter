@@ -71,18 +71,28 @@ func (self *Emitter) RemoveListener(event string, callback func(...interface{}))
 }
 
 func (self *Emitter) removeListenerInternal(event string, callback func(...interface{}), suppress bool) *Emitter {
+	self.mutex.Lock()
+
 	if _, ok := self.listeners[event]; !ok {
+		self.mutex.Unlock()
 		return self
 	}
+
 	for k, v := range self.listeners[event] {
 		if reflect.ValueOf(v.callback).Pointer() == reflect.ValueOf(callback).Pointer() {
 			self.listeners[event] = append(self.listeners[event][:k], self.listeners[event][k+1:]...)
+
+			self.mutex.Unlock()
+
 			if !suppress {
 				self.EmitSync("removeListener", []interface{}{event, callback})
 			}
 			return self
 		}
 	}
+
+	self.mutex.Unlock()
+
 	return self
 }
 
@@ -104,6 +114,9 @@ func (self *Emitter) RemoveAllListeners(event interface{}) *Emitter {
 
 // Listeners() - return an array with the registered listeners in the specified event
 func (self *Emitter) Listeners(event string) []Listener {
+	self.mutex.Lock()
+	defer self.mutex.Unlock()
+
 	if _, ok := self.listeners[event]; !ok {
 		return nil
 	}
@@ -117,8 +130,6 @@ func (self *Emitter) ListenersCount(event string) int {
 
 // EmitSync() - run all listeners of the specified event in synchronous mode
 func (self *Emitter) EmitSync(event string, args ...interface{}) *Emitter {
-	self.mutex.Lock()
-	defer self.mutex.Unlock()
 	for _, v := range self.Listeners(event) {
 		if v.once {
 			self.removeListenerInternal(event, v.callback, true)
@@ -131,8 +142,6 @@ func (self *Emitter) EmitSync(event string, args ...interface{}) *Emitter {
 
 // EmitAsync() - run all listeners of the specified event in asynchronous mode using goroutines
 func (self *Emitter) EmitAsync(event string, args []interface{}) *Emitter {
-	self.mutex.Lock()
-	defer self.mutex.Unlock()
 	for _, v := range self.Listeners(event) {
 		if v.once {
 			self.removeListenerInternal(event, v.callback, true)
