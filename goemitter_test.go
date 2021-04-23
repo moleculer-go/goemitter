@@ -47,6 +47,27 @@ func TestOnce(t *testing.T) {
 	expect(t, 1, counter)
 }
 
+func TestWildCardSupport(t *testing.T)  {
+	emitter := Construct()
+
+	counter := 0
+	fn1 := func(args ...interface{}) {
+		counter++
+	}
+
+	emitter.On("testevent", fn1)
+	emitter.On("test*", fn1)
+	emitter.On("t*", fn1)
+	emitter.On("nomatch", fn1)
+
+	emitter.EmitSync("testevent")
+
+	listenersCount := emitter.ListenersCount("testevent")
+
+	expect(t, 3, listenersCount, "wrong listeners count")
+	expect(t, 3, counter, "wrong fn execution")
+}
+
 func TestRandomConcurrentCalls(t *testing.T) {
 	emitter := Construct()
 
@@ -104,8 +125,8 @@ func TestRandomConcurrentCalls(t *testing.T) {
 	expect(t, nil, err)
 }
 
-func expect(t *testing.T, a interface{}, b interface{}) {
+func expect(t *testing.T, a interface{}, b interface{}, desc ...string) {
 	if a != b {
-		t.Errorf("Expected %v (type %v) - Got %v (type %v)", b, reflect.TypeOf(b), a, reflect.TypeOf(a))
+		t.Errorf("%v+ -> Expected %v (type %v) - Got %v (type %v)", desc, a, reflect.TypeOf(a), b, reflect.TypeOf(b))
 	}
 }
