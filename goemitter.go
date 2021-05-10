@@ -6,8 +6,29 @@ package Emitter
 
 import (
 	"reflect"
+	"strings"
 	"sync"
 )
+
+// wildcard helper
+func eventMatchPattern(eventName, pattern []rune) bool {
+	for len(pattern) > 0 {
+		switch pattern[0] {
+		case '*':
+			return eventMatchPattern(eventName, pattern[1:]) || (len(eventName) > 0 && eventMatchPattern(eventName[1:], pattern))
+
+		default:
+			if len(eventName) == 0 || eventName[0] != pattern[0] {
+				return false
+			}
+		}
+
+		eventName = eventName[1:]
+		pattern = pattern[1:]
+	}
+
+	return len(eventName) == 0 && len(pattern) == 0
+}
 
 // Emitter - our listeners container
 type Emitter struct {
@@ -117,10 +138,27 @@ func (self *Emitter) Listeners(event string) []Listener {
 	self.mutex.Lock()
 	defer self.mutex.Unlock()
 
-	if _, ok := self.listeners[event]; !ok {
-		return nil
+	listeners := make([]Listener, 0)
+
+	// add the ones that follow pattern
+	for eventPattern, lis := range self.listeners {
+		shouldAdd := false
+
+		// add generic "**" bound listeners
+		shouldAdd = shouldAdd || eventPattern.(string) == "**"
+		// add listener bound on full name event
+		shouldAdd = shouldAdd || eventPattern.(string) == event
+		// add listeners that have matching wildcard pattern
+		shouldAdd = shouldAdd ||
+			(strings.Contains(eventPattern.(string), "*") &&
+				eventMatchPattern([]rune(event), []rune(eventPattern.(string))))
+
+		if shouldAdd {
+			listeners = append(listeners, lis...)
+		}
 	}
-	return self.listeners[event]
+
+	return listeners
 }
 
 // ListenersCount() - return the count of listeners in the speicifed event

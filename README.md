@@ -68,6 +68,12 @@ func main(){
 
 	// register
 	emitter.On("myevent", fn)
+	
+    // listen to all events
+	emitter.On("**", fn)
+
+    // listen to events based on widlcard
+	emitter.On("my*", fn)
 
 	// now remove it
 	emitter.RemoveListener("myevent", fn)
